@@ -117,17 +117,39 @@ function updateAudioUI() {
   volumeControl.value = Math.round(state.volume * 100);
 }
 
+async function fadeAudio(targetVolume, duration = 1200) {
+  const startVolume = meditationAudio.volume;
+  const startTime = performance.now();
+
+  return new Promise((resolve) => {
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = progress * (2 - progress);
+      meditationAudio.volume = startVolume + (targetVolume - startVolume) * eased;
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
+    }
+    requestAnimationFrame(step);
+  });
+}
+
 async function playMeditationAudio() {
   if (!state.audioEnabled) {
     updateAudioUI();
     return;
   }
 
-  meditationAudio.volume = state.volume;
   meditationAudio.currentTime = meditationAudio.currentTime || 0;
+  meditationAudio.volume = 0;
 
   try {
     await meditationAudio.play();
+    await fadeAudio(state.volume, 1800);
     audioStatus.textContent = '播放中';
   } catch (error) {
     console.warn('Audio playback failed:', error);
@@ -135,8 +157,11 @@ async function playMeditationAudio() {
   }
 }
 
-function stopMeditationAudio(statusText = '未播放') {
-  meditationAudio.pause();
+async function stopMeditationAudio(statusText = '未播放') {
+  if (!meditationAudio.paused) {
+    await fadeAudio(0, 800);
+    meditationAudio.pause();
+  }
   audioStatus.textContent = statusText;
 }
 
@@ -168,10 +193,15 @@ function runBreathLoop(index = 0) {
   }, step.seconds * 1000);
 }
 
+function updateBodyState(newState) {
+  document.body.setAttribute('data-state', newState);
+}
+
 async function startSession() {
   clearTimers();
   state.running = true;
   updateStatus('进行中');
+  updateBodyState('running');
   await playMeditationAudio();
   runBreathLoop();
   state.countdownTimer = setInterval(() => {
@@ -183,29 +213,31 @@ async function startSession() {
   }, 1000);
 }
 
-function pauseSession() {
+async function pauseSession() {
   if (!state.running) return;
   clearTimers();
   state.running = false;
   breathText.textContent = '暂停中';
   breathOrb.className = 'orb-core hold';
   updateStatus('已暂停');
-  stopMeditationAudio('已暂停');
+  updateBodyState('paused');
+  await stopMeditationAudio('已暂停');
 }
 
-function finishSession() {
+async function finishSession() {
   clearTimers();
   state.running = false;
   state.remaining = 0;
   updateTimeUI();
   updateStatus('已完成');
+  updateBodyState('finished');
   breathText.textContent = '今晚辛苦了';
   breathOrb.className = 'orb-core inhale';
   guideText.textContent = '这次做得很好。现在先别急着离开，花两秒感受一下：你的身体是不是已经比刚开始更松一点了？';
-  stopMeditationAudio('已结束');
+  await stopMeditationAudio('已结束');
 }
 
-function resetSession() {
+async function resetSession() {
   clearTimers();
   state.running = false;
   state.remaining = state.minutes * 60;
@@ -213,7 +245,8 @@ function resetSession() {
   updateThemeUI();
   updateTimeUI();
   updateStatus('未开始');
-  stopMeditationAudio(state.audioEnabled ? '准备播放' : '已静音');
+  updateBodyState('idle');
+  await stopMeditationAudio(state.audioEnabled ? '准备播放' : '已静音');
   idleOrb();
 }
 
@@ -248,7 +281,7 @@ document.getElementById('startBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('quickStartBtn').addEventListener('click', async () => {
-  resetSession();
+  await resetSession();
   await startSession();
 });
 
@@ -257,7 +290,7 @@ audioToggleBtn.addEventListener('click', async () => {
   updateAudioUI();
 
   if (!state.audioEnabled) {
-    stopMeditationAudio('已静音');
+    await stopMeditationAudio('已静音');
     return;
   }
 
@@ -268,11 +301,13 @@ audioToggleBtn.addEventListener('click', async () => {
 
 volumeControl.addEventListener('input', (event) => {
   state.volume = Number(event.target.value) / 100;
-  meditationAudio.volume = state.volume;
+  if (!meditationAudio.paused) {
+    meditationAudio.volume = state.volume;
+  }
 });
 
-document.getElementById('pauseBtn').addEventListener('click', pauseSession);
-document.getElementById('resetBtn').addEventListener('click', resetSession);
+document.getElementById('pauseBtn').addEventListener('click', () => pauseSession());
+document.getElementById('resetBtn').addEventListener('click', () => resetSession());
 
 document.getElementById('saveReflectionBtn').addEventListener('click', () => {
   const text = reflectionInput.value.trim();
@@ -286,4 +321,5 @@ document.getElementById('saveReflectionBtn').addEventListener('click', () => {
 
 updateThemeUI();
 updateAudioUI();
+updateBodyState('idle');
 resetSession();

@@ -7,11 +7,16 @@
   --muted: #b8c0da;
   --muted-2: #8f9aba;
   --line: rgba(255, 255, 255, 0.1);
-  --accent: #d4b6ff;
-  --accent-deep: #9d7cff;
+  --accent: #8ff4d8;
+  --accent-deep: #4dd0a8;
   --accent-blue: #8ad7ff;
   --accent-green: #8ff4d8;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+
+  /* Theme color palettes */
+  --hue-default: 220;
+  --hue-green: 160;
+  --hue-active: var(--hue-green);
 }
 
 * {
@@ -24,16 +29,30 @@ body {
   min-height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
   background:
-    radial-gradient(circle at 20% 10%, rgba(138, 215, 255, 0.18), transparent 28%),
-    radial-gradient(circle at 80% 0%, rgba(212, 182, 255, 0.18), transparent 24%),
-    linear-gradient(180deg, #09101d 0%, #141b33 100%);
+    radial-gradient(circle at 20% 10%, hsla(var(--hue-active), 70%, 65%, 0.22), transparent 28%),
+    radial-gradient(circle at 80% 0%, hsla(var(--hue-active), 60%, 70%, 0.18), transparent 24%),
+    linear-gradient(180deg, hsl(var(--hue-active), 25%, 8%) 0%, hsl(var(--hue-active), 20%, 12%) 100%);
   color: var(--text);
+  transition: background 1.2s ease;
 }
 
 body {
   display: flex;
   justify-content: center;
   padding: 18px 0 32px;
+}
+
+/* Theme states */
+body[data-state="running"] {
+  --hue-active: var(--hue-green);
+}
+
+body[data-state="paused"] {
+  --hue-active: var(--hue-default);
+}
+
+body[data-state="finished"] {
+  --hue-active: var(--hue-green);
 }
 
 .phone-shell {
@@ -49,18 +68,20 @@ body {
   padding: 12px 14px 110px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
-    linear-gradient(180deg, #0c1224, #141c37);
+    linear-gradient(180deg, hsl(var(--hue-active), 22%, 10%), hsl(var(--hue-active), 18%, 14%));
   border: 1px solid rgba(255,255,255,0.08);
   box-shadow: var(--shadow);
   overflow: hidden;
+  transition: background 1.2s ease;
 }
 
 .app-frame::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 36%);
+  background: radial-gradient(circle at top, hsla(var(--hue-active), 60%, 70%, 0.12), transparent 36%);
   pointer-events: none;
+  transition: background 1.2s ease;
 }
 
 .status-bar,
