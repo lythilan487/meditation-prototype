@@ -1,0 +1,17 @@
+{
+  "name": "静下来",
+  "short_name": "静下来",
+  "description": "一个更温柔的冥想工具，用呼吸、声音和引导语，帮你从紧绷里慢慢松开。",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#103328",
+  "theme_color": "#5AD4A6",
+  "icons": [
+    {
+      "src": "./assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
