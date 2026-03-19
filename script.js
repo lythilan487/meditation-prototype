@@ -92,6 +92,7 @@ const CHECKIN_STORAGE_KEY = 'jingdown-checkins-v1';
 
 let audioContext = null;
 let audioUnlocked = false;
+let speechReady = 'speechSynthesis' in window;
 
 function formatTime(totalSeconds) {
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -123,8 +124,24 @@ function updateStatus(text) {
 function updateAudioUI() {
   ambientTag.textContent = '轻柔冥想音乐';
   audioStatus.textContent = state.audioEnabled ? '准备播放' : '已静音';
-  audioToggleBtn.textContent = state.audioEnabled ? '关闭音乐' : '开启音乐';
+  audioToggleBtn.textContent = state.audioEnabled ? '暂停音乐' : '播放音乐';
   volumeControl.value = Math.round(state.volume * 100);
+}
+
+function speakCue(text) {
+  if (!speechReady || !window.speechSynthesis) return;
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = Math.min(1, Math.max(0.25, state.volume));
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.warn('Speech cue failed:', error);
+  }
 }
 
 function getStoredCheckins() {
@@ -331,9 +348,18 @@ function runBreathLoop(index = 0) {
   breathOrb.className = `orb-core ${step.className}`;
   breathText.textContent = step.phase;
 
-  if (step.phase === '吸气') playCue('inhale');
-  if (step.phase === '停留') playCue('hold');
-  if (step.phase === '呼气') playCue('exhale');
+  if (step.phase === '吸气') {
+    playCue('inhale');
+    speakCue('吸气');
+  }
+  if (step.phase === '停留') {
+    playCue('hold');
+    speakCue('停留');
+  }
+  if (step.phase === '呼气') {
+    playCue('exhale');
+    speakCue('呼气');
+  }
 
   state.breathTimer = setTimeout(() => {
     if (step.phase === '呼气') {
@@ -446,6 +472,7 @@ testSoundBtn.addEventListener('click', async () => {
     await meditationAudio.play();
     audioStatus.textContent = '测试播放中';
     playCue('test');
+    speakCue('可以听到声音吗');
     setTimeout(() => {
       meditationAudio.pause();
       meditationAudio.currentTime = 0;
@@ -454,21 +481,21 @@ testSoundBtn.addEventListener('click', async () => {
   } catch (error) {
     console.warn('Test playback failed:', error);
     playCue('test');
+    speakCue('测试声音');
     audioStatus.textContent = '提示音可用，背景音乐受限';
   }
 });
 
 audioToggleBtn.addEventListener('click', async () => {
-  state.audioEnabled = !state.audioEnabled;
-  updateAudioUI();
-
-  if (!state.audioEnabled) {
-    await stopMeditationAudio('已静音');
-    return;
-  }
-
-  if (state.running) {
+  if (meditationAudio.paused || !state.audioEnabled) {
+    state.audioEnabled = true;
+    updateAudioUI();
     await playMeditationAudio();
+    audioStatus.textContent = '音乐播放中';
+  } else {
+    state.audioEnabled = false;
+    updateAudioUI();
+    await stopMeditationAudio('已静音');
   }
 });
 
