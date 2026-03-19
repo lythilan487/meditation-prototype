@@ -81,15 +81,7 @@ const ambientTag = document.getElementById('ambientTag');
 const audioStatus = document.getElementById('audioStatus');
 const audioToggleBtn = document.getElementById('audioToggleBtn');
 const volumeControl = document.getElementById('volumeControl');
-
-let audioContext;
-let masterGain;
-let padGain;
-let pulseGain;
-let oscillatorA;
-let oscillatorB;
-let lfo;
-let filterNode;
+const meditationAudio = document.getElementById('meditationAudio');
 
 function formatTime(totalSeconds) {
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -125,96 +117,26 @@ function updateAudioUI() {
   volumeControl.value = Math.round(state.volume * 100);
 }
 
-function ensureAudio() {
-  if (audioContext) return;
-
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  masterGain = audioContext.createGain();
-  masterGain.gain.value = 0;
-  masterGain.connect(audioContext.destination);
-
-  filterNode = audioContext.createBiquadFilter();
-  filterNode.type = 'lowpass';
-  filterNode.frequency.value = 900;
-  filterNode.Q.value = 0.8;
-
-  padGain = audioContext.createGain();
-  padGain.gain.value = 0.0001;
-
-  pulseGain = audioContext.createGain();
-  pulseGain.gain.value = 0.0001;
-
-  oscillatorA = audioContext.createOscillator();
-  oscillatorA.type = 'triangle';
-  oscillatorA.frequency.value = 220;
-
-  oscillatorB = audioContext.createOscillator();
-  oscillatorB.type = 'sine';
-  oscillatorB.frequency.value = 329.63;
-
-  lfo = audioContext.createOscillator();
-  lfo.type = 'sine';
-  lfo.frequency.value = 0.08;
-
-  const lfoGain = audioContext.createGain();
-  lfoGain.gain.value = 18;
-
-  oscillatorA.connect(filterNode);
-  oscillatorB.connect(filterNode);
-  filterNode.connect(padGain);
-  padGain.connect(masterGain);
-  lfo.connect(lfoGain);
-  lfoGain.connect(filterNode.frequency);
-
-  const pulseOsc = audioContext.createOscillator();
-  pulseOsc.type = 'sine';
-  pulseOsc.frequency.value = 440;
-  pulseOsc.connect(pulseGain);
-  pulseGain.connect(masterGain);
-  pulseOsc.start();
-
-  oscillatorA.start();
-  oscillatorB.start();
-  lfo.start();
-
-  window.__meditationPulseOsc = pulseOsc;
-}
-
 async function playMeditationAudio() {
   if (!state.audioEnabled) {
     updateAudioUI();
     return;
   }
 
-  ensureAudio();
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
+  meditationAudio.volume = state.volume;
+  meditationAudio.currentTime = meditationAudio.currentTime || 0;
+
+  try {
+    await meditationAudio.play();
+    audioStatus.textContent = '播放中';
+  } catch (error) {
+    console.warn('Audio playback failed:', error);
+    audioStatus.textContent = '等待播放';
   }
-
-  const now = audioContext.currentTime;
-  masterGain.gain.cancelScheduledValues(now);
-  padGain.gain.cancelScheduledValues(now);
-  pulseGain.gain.cancelScheduledValues(now);
-
-  masterGain.gain.linearRampToValueAtTime(state.volume, now + 1.8);
-  padGain.gain.linearRampToValueAtTime(0.22, now + 2.4);
-  pulseGain.gain.linearRampToValueAtTime(0.035, now + 2.4);
-  audioStatus.textContent = '播放中';
 }
 
 function stopMeditationAudio(statusText = '未播放') {
-  if (!audioContext || !masterGain || !padGain || !pulseGain) {
-    audioStatus.textContent = statusText;
-    return;
-  }
-
-  const now = audioContext.currentTime;
-  masterGain.gain.cancelScheduledValues(now);
-  padGain.gain.cancelScheduledValues(now);
-  pulseGain.gain.cancelScheduledValues(now);
-  masterGain.gain.linearRampToValueAtTime(0, now + 0.8);
-  padGain.gain.linearRampToValueAtTime(0.0001, now + 0.8);
-  pulseGain.gain.linearRampToValueAtTime(0.0001, now + 0.8);
+  meditationAudio.pause();
   audioStatus.textContent = statusText;
 }
 
@@ -346,10 +268,7 @@ audioToggleBtn.addEventListener('click', async () => {
 
 volumeControl.addEventListener('input', (event) => {
   state.volume = Number(event.target.value) / 100;
-  if (masterGain && state.audioEnabled && audioContext) {
-    masterGain.gain.cancelScheduledValues(audioContext.currentTime);
-    masterGain.gain.linearRampToValueAtTime(state.volume, audioContext.currentTime + 0.2);
-  }
+  meditationAudio.volume = state.volume;
 });
 
 document.getElementById('pauseBtn').addEventListener('click', pauseSession);
