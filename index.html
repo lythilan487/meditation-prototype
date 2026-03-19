@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <title>静下来 App · 高保真原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="phone-shell">
+      <div class="app-frame">
+        <div class="status-bar">
+          <span>21:27</span>
+          <div class="status-icons">
+            <i></i><i></i><i></i>
+          </div>
+        </div>
+
+        <header class="top-hero">
+          <div>
+            <p class="eyebrow">Jing Down</p>
+            <h1>今晚，先照顾一下自己</h1>
+            <p class="subcopy">一个更温柔的冥想工具，用呼吸、声音和引导语，帮你从紧绷里慢慢松开。</p>
+          </div>
+          <button class="icon-btn" aria-label="个人中心">☺</button>
+        </header>
+
+        <section class="hero-card premium-card">
+          <div class="hero-card-top">
+            <div>
+              <p class="mini-label">推荐练习</p>
+              <h2 id="suggestionText">睡前 5 分钟放松</h2>
+            </div>
+            <span class="badge">Tonight</span>
+          </div>
+
+          <div class="orb-stage">
+            <div class="orb-glow"></div>
+            <div class="orb-ring ring-one"></div>
+            <div class="orb-ring ring-two"></div>
+            <div class="orb-core" id="breathOrb"></div>
+            <div class="orb-caption" id="breathText">准备开始</div>
+          </div>
+
+          <div class="hero-card-bottom">
+            <div>
+              <p class="mini-label">本次时长</p>
+              <strong id="timerDisplay">05:00</strong>
+            </div>
+            <button id="quickStartBtn" class="primary-btn">开始这次冥想</button>
+          </div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-header">
+            <h3>适合你现在的状态</h3>
+            <span id="sessionStatus" class="pill">未开始</span>
+          </div>
+          <div class="theme-scroll" id="themeChips">
+            <button class="theme-card active" data-theme="sleep">
+              <span class="theme-emoji">🌙</span>
+              <strong>睡前放松</strong>
+              <small>收住杂念，慢慢入睡</small>
+            </button>
+            <button class="theme-card" data-theme="relax">
+              <span class="theme-emoji">💧</span>
+              <strong>缓解焦虑</strong>
+              <small>把绷紧一点点放掉</small>
+            </button>
+            <button class="theme-card" data-theme="focus">
+              <span class="theme-emoji">✨</span>
+              <strong>恢复专注</strong>
+              <small>把散掉的注意力收回来</small>
+            </button>
+            <button class="theme-card" data-theme="gentle">
+              <span class="theme-emoji">🤍</span>
+              <strong>自我安抚</strong>
+              <small>允许自己先被接住</small>
+            </button>
+          </div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-header compact">
+            <h3>呼吸节奏</h3>
+            <span class="mini-link">可自定义</span>
+          </div>
+          <div class="segment-control" id="durationChips">
+            <button class="segment-btn" data-minutes="3">3 分钟</button>
+            <button class="segment-btn active" data-minutes="5">5 分钟</button>
+            <button class="segment-btn" data-minutes="10">10 分钟</button>
+          </div>
+          <div class="breath-cards">
+            <button class="breath-card" data-breath="4-2-6">
+              <strong>4-2-6</strong>
+              <span>适合情绪缓和</span>
+            </button>
+            <button class="breath-card active" data-breath="4-7-8">
+              <strong>4-7-8</strong>
+              <span>适合睡前慢下来</span>
+            </button>
+            <button class="breath-card" data-breath="4-4-4">
+              <strong>4-4-4</strong>
+              <span>适合白天回稳</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section-block guide-panel">
+          <div class="section-header compact">
+            <h3 id="themeTitle">睡前放松</h3>
+            <span class="ambient-tag">海盐白噪音</span>
+          </div>
+          <p id="guideText" class="guide-copy">把今天先放在门外。此刻不用复盘、不用证明自己，只要慢慢把呼吸放轻一点。</p>
+          <div class="ambient-visual">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </section>
+
+        <section class="section-block action-panel">
+          <button id="startBtn" class="primary-btn full">开始</button>
+          <div class="double-actions">
+            <button id="pauseBtn" class="secondary-btn">暂停</button>
+            <button id="resetBtn" class="ghost-btn">重置</button>
+          </div>
+        </section>
+
+        <section class="section-block reflection-panel">
+          <div class="section-header compact">
+            <h3>冥想后感受</h3>
+            <span class="mini-link">连续打卡 7 天</span>
+          </div>
+          <textarea id="reflectionInput" placeholder="写下一句此刻的感觉，比如：肩膀终于放松一点了。"></textarea>
+          <button id="saveReflectionBtn" class="save-chip">保存这次感受</button>
+          <div class="saved-box" id="savedReflection">今晚还没有记录。等你完成一次冥想，把这一刻存下来。</div>
+        </section>
+
+        <nav class="bottom-nav">
+          <button class="nav-item active">
+            <span>首页</span>
+          </button>
+          <button class="nav-item">
+            <span>练习</span>
+          </button>
+          <button class="nav-item">
+            <span>睡眠</span>
+          </button>
+          <button class="nav-item">
+            <span>我的</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
