@@ -82,6 +82,12 @@ const audioStatus = document.getElementById('audioStatus');
 const audioToggleBtn = document.getElementById('audioToggleBtn');
 const volumeControl = document.getElementById('volumeControl');
 const meditationAudio = document.getElementById('meditationAudio');
+const streakDays = document.getElementById('streakDays');
+const totalSessions = document.getElementById('totalSessions');
+const lastSessionText = document.getElementById('lastSessionText');
+const streakHint = document.getElementById('streakHint');
+
+const CHECKIN_STORAGE_KEY = 'jingdown-checkins-v1';
 
 function formatTime(totalSeconds) {
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -115,6 +121,83 @@ function updateAudioUI() {
   audioStatus.textContent = state.audioEnabled ? '准备播放' : '已静音';
   audioToggleBtn.textContent = state.audioEnabled ? '关闭音乐' : '开启音乐';
   volumeControl.value = Math.round(state.volume * 100);
+}
+
+function getStoredCheckins() {
+  try {
+    return JSON.parse(localStorage.getItem(CHECKIN_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredCheckins(entries) {
+  localStorage.setItem(CHECKIN_STORAGE_KEY, JSON.stringify(entries));
+}
+
+function normalizeDateKey(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString().slice(0, 10);
+}
+
+function calculateStreak(entries) {
+  if (!entries.length) return 0;
+  const days = [...new Set(entries.map((entry) => entry.date))].sort().reverse();
+  let streak = 0;
+  let cursor = new Date();
+
+  for (const day of days) {
+    const expected = normalizeDateKey(cursor);
+    if (day !== expected) {
+      if (streak === 0 && day === normalizeDateKey(new Date(Date.now() - 86400000))) {
+        cursor = new Date(cursor.getTime() - 86400000);
+      } else {
+        break;
+      }
+    }
+    if (day === normalizeDateKey(cursor)) {
+      streak += 1;
+      cursor = new Date(cursor.getTime() - 86400000);
+    }
+  }
+
+  return streak;
+}
+
+function updateCheckinUI() {
+  const entries = getStoredCheckins();
+  const total = entries.length;
+  const last = entries[entries.length - 1];
+  const streak = calculateStreak(entries);
+
+  streakDays.textContent = String(streak);
+  totalSessions.textContent = String(total);
+  lastSessionText.textContent = last ? `${last.date} · ${last.minutes}分钟` : '还没有打卡';
+
+  if (streak >= 7) {
+    streakHint.textContent = '你已经连续坚持 7 天+';
+  } else if (streak > 0) {
+    streakHint.textContent = `已经连续 ${streak} 天了`;
+  } else {
+    streakHint.textContent = '刚开始也很好';
+  }
+}
+
+function recordCheckin() {
+  const entries = getStoredCheckins();
+  const today = normalizeDateKey();
+  const alreadyExists = entries.some((entry) => entry.date === today && entry.minutes === state.minutes && entry.theme === state.theme);
+
+  if (!alreadyExists) {
+    entries.push({
+      date: today,
+      minutes: state.minutes,
+      theme: state.theme,
+      createdAt: new Date().toISOString()
+    });
+    saveStoredCheckins(entries);
+  }
+
+  updateCheckinUI();
 }
 
 async function fadeAudio(targetVolume, duration = 1200) {
@@ -234,6 +317,7 @@ async function finishSession() {
   breathText.textContent = '今晚辛苦了';
   breathOrb.className = 'orb-core inhale';
   guideText.textContent = '这次做得很好。现在先别急着离开，花两秒感受一下：你的身体是不是已经比刚开始更松一点了？';
+  recordCheckin();
   await stopMeditationAudio('已结束');
 }
 
@@ -321,5 +405,6 @@ document.getElementById('saveReflectionBtn').addEventListener('click', () => {
 
 updateThemeUI();
 updateAudioUI();
+updateCheckinUI();
 updateBodyState('idle');
 resetSession();
