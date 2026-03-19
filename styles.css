@@ -378,6 +378,24 @@ textarea,
   margin: 12px 0 0;
 }
 
+.audio-controls {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.volume-wrap {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.volume-wrap input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent-blue);
+}
+
 .ambient-visual {
   display: flex;
   align-items: flex-end;

@@ -63,7 +63,9 @@ const state = {
   running: false,
   guideIndex: 0,
   countdownTimer: null,
-  breathTimer: null
+  breathTimer: null,
+  audioEnabled: true,
+  volume: 0.55
 };
 
 const suggestionText = document.getElementById('suggestionText');
@@ -75,6 +77,19 @@ const sessionStatus = document.getElementById('sessionStatus');
 const breathOrb = document.getElementById('breathOrb');
 const reflectionInput = document.getElementById('reflectionInput');
 const savedReflection = document.getElementById('savedReflection');
+const ambientTag = document.getElementById('ambientTag');
+const audioStatus = document.getElementById('audioStatus');
+const audioToggleBtn = document.getElementById('audioToggleBtn');
+const volumeControl = document.getElementById('volumeControl');
+
+let audioContext;
+let masterGain;
+let padGain;
+let pulseGain;
+let oscillatorA;
+let oscillatorB;
+let lfo;
+let filterNode;
 
 function formatTime(totalSeconds) {
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -101,6 +116,106 @@ function updateTimeUI() {
 
 function updateStatus(text) {
   sessionStatus.textContent = text;
+}
+
+function updateAudioUI() {
+  ambientTag.textContent = '轻柔冥想音乐';
+  audioStatus.textContent = state.audioEnabled ? '准备播放' : '已静音';
+  audioToggleBtn.textContent = state.audioEnabled ? '关闭音乐' : '开启音乐';
+  volumeControl.value = Math.round(state.volume * 100);
+}
+
+function ensureAudio() {
+  if (audioContext) return;
+
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioContext.createGain();
+  masterGain.gain.value = 0;
+  masterGain.connect(audioContext.destination);
+
+  filterNode = audioContext.createBiquadFilter();
+  filterNode.type = 'lowpass';
+  filterNode.frequency.value = 900;
+  filterNode.Q.value = 0.8;
+
+  padGain = audioContext.createGain();
+  padGain.gain.value = 0.0001;
+
+  pulseGain = audioContext.createGain();
+  pulseGain.gain.value = 0.0001;
+
+  oscillatorA = audioContext.createOscillator();
+  oscillatorA.type = 'triangle';
+  oscillatorA.frequency.value = 220;
+
+  oscillatorB = audioContext.createOscillator();
+  oscillatorB.type = 'sine';
+  oscillatorB.frequency.value = 329.63;
+
+  lfo = audioContext.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.08;
+
+  const lfoGain = audioContext.createGain();
+  lfoGain.gain.value = 18;
+
+  oscillatorA.connect(filterNode);
+  oscillatorB.connect(filterNode);
+  filterNode.connect(padGain);
+  padGain.connect(masterGain);
+  lfo.connect(lfoGain);
+  lfoGain.connect(filterNode.frequency);
+
+  const pulseOsc = audioContext.createOscillator();
+  pulseOsc.type = 'sine';
+  pulseOsc.frequency.value = 440;
+  pulseOsc.connect(pulseGain);
+  pulseGain.connect(masterGain);
+  pulseOsc.start();
+
+  oscillatorA.start();
+  oscillatorB.start();
+  lfo.start();
+
+  window.__meditationPulseOsc = pulseOsc;
+}
+
+async function playMeditationAudio() {
+  if (!state.audioEnabled) {
+    updateAudioUI();
+    return;
+  }
+
+  ensureAudio();
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume();
+  }
+
+  const now = audioContext.currentTime;
+  masterGain.gain.cancelScheduledValues(now);
+  padGain.gain.cancelScheduledValues(now);
+  pulseGain.gain.cancelScheduledValues(now);
+
+  masterGain.gain.linearRampToValueAtTime(state.volume, now + 1.8);
+  padGain.gain.linearRampToValueAtTime(0.22, now + 2.4);
+  pulseGain.gain.linearRampToValueAtTime(0.035, now + 2.4);
+  audioStatus.textContent = '播放中';
+}
+
+function stopMeditationAudio(statusText = '未播放') {
+  if (!audioContext || !masterGain || !padGain || !pulseGain) {
+    audioStatus.textContent = statusText;
+    return;
+  }
+
+  const now = audioContext.currentTime;
+  masterGain.gain.cancelScheduledValues(now);
+  padGain.gain.cancelScheduledValues(now);
+  pulseGain.gain.cancelScheduledValues(now);
+  masterGain.gain.linearRampToValueAtTime(0, now + 0.8);
+  padGain.gain.linearRampToValueAtTime(0.0001, now + 0.8);
+  pulseGain.gain.linearRampToValueAtTime(0.0001, now + 0.8);
+  audioStatus.textContent = statusText;
 }
 
 function clearTimers() {
@@ -131,10 +246,11 @@ function runBreathLoop(index = 0) {
   }, step.seconds * 1000);
 }
 
-function startSession() {
+async function startSession() {
   clearTimers();
   state.running = true;
   updateStatus('进行中');
+  await playMeditationAudio();
   runBreathLoop();
   state.countdownTimer = setInterval(() => {
     state.remaining -= 1;
@@ -152,6 +268,7 @@ function pauseSession() {
   breathText.textContent = '暂停中';
   breathOrb.className = 'orb-core hold';
   updateStatus('已暂停');
+  stopMeditationAudio('已暂停');
 }
 
 function finishSession() {
@@ -163,6 +280,7 @@ function finishSession() {
   breathText.textContent = '今晚辛苦了';
   breathOrb.className = 'orb-core inhale';
   guideText.textContent = '这次做得很好。现在先别急着离开，花两秒感受一下：你的身体是不是已经比刚开始更松一点了？';
+  stopMeditationAudio('已结束');
 }
 
 function resetSession() {
@@ -173,6 +291,7 @@ function resetSession() {
   updateThemeUI();
   updateTimeUI();
   updateStatus('未开始');
+  stopMeditationAudio(state.audioEnabled ? '准备播放' : '已静音');
   idleOrb();
 }
 
@@ -201,14 +320,36 @@ document.querySelector('.breath-cards').addEventListener('click', (event) => {
   resetSession();
 });
 
-document.getElementById('startBtn').addEventListener('click', () => {
+document.getElementById('startBtn').addEventListener('click', async () => {
   if (state.remaining <= 0) state.remaining = state.minutes * 60;
-  if (!state.running) startSession();
+  if (!state.running) await startSession();
 });
 
-document.getElementById('quickStartBtn').addEventListener('click', () => {
+document.getElementById('quickStartBtn').addEventListener('click', async () => {
   resetSession();
-  startSession();
+  await startSession();
+});
+
+audioToggleBtn.addEventListener('click', async () => {
+  state.audioEnabled = !state.audioEnabled;
+  updateAudioUI();
+
+  if (!state.audioEnabled) {
+    stopMeditationAudio('已静音');
+    return;
+  }
+
+  if (state.running) {
+    await playMeditationAudio();
+  }
+});
+
+volumeControl.addEventListener('input', (event) => {
+  state.volume = Number(event.target.value) / 100;
+  if (masterGain && state.audioEnabled && audioContext) {
+    masterGain.gain.cancelScheduledValues(audioContext.currentTime);
+    masterGain.gain.linearRampToValueAtTime(state.volume, audioContext.currentTime + 0.2);
+  }
 });
 
 document.getElementById('pauseBtn').addEventListener('click', pauseSession);
@@ -225,4 +366,5 @@ document.getElementById('saveReflectionBtn').addEventListener('click', () => {
 });
 
 updateThemeUI();
+updateAudioUI();
 resetSession();
