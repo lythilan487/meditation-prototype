@@ -80,6 +80,7 @@ const savedReflection = document.getElementById('savedReflection');
 const ambientTag = document.getElementById('ambientTag');
 const audioStatus = document.getElementById('audioStatus');
 const audioToggleBtn = document.getElementById('audioToggleBtn');
+const testSoundBtn = document.getElementById('testSoundBtn');
 const volumeControl = document.getElementById('volumeControl');
 const meditationAudio = document.getElementById('meditationAudio');
 const streakDays = document.getElementById('streakDays');
@@ -88,6 +89,9 @@ const lastSessionText = document.getElementById('lastSessionText');
 const streakHint = document.getElementById('streakHint');
 
 const CHECKIN_STORAGE_KEY = 'jingdown-checkins-v1';
+
+let audioContext = null;
+let audioUnlocked = false;
 
 function formatTime(totalSeconds) {
   const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -200,6 +204,65 @@ function recordCheckin() {
   updateCheckinUI();
 }
 
+function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+async function unlockAudio() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    audioUnlocked = true;
+    return true;
+  } catch (error) {
+    console.warn('Audio unlock failed:', error);
+    return false;
+  }
+}
+
+async function playCue(type = 'inhale') {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    const settings = {
+      inhale: { freq: 540, duration: 0.18 },
+      hold: { freq: 420, duration: 0.12 },
+      exhale: { freq: 300, duration: 0.24 },
+      test: { freq: 660, duration: 0.2 }
+    }[type] || { freq: 500, duration: 0.18 };
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(settings.freq, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + settings.duration);
+    osc.start(now);
+    osc.stop(now + settings.duration + 0.03);
+  } catch (error) {
+    console.warn('Cue playback failed:', error);
+  }
+}
+
 async function fadeAudio(targetVolume, duration = 1200) {
   const startVolume = meditationAudio.volume;
   const startTime = performance.now();
@@ -227,6 +290,7 @@ async function playMeditationAudio() {
     return;
   }
 
+  await unlockAudio();
   meditationAudio.currentTime = meditationAudio.currentTime || 0;
   meditationAudio.volume = 0;
 
@@ -236,7 +300,7 @@ async function playMeditationAudio() {
     audioStatus.textContent = '播放中';
   } catch (error) {
     console.warn('Audio playback failed:', error);
-    audioStatus.textContent = '等待播放';
+    audioStatus.textContent = audioUnlocked ? '点击测试声音后再试' : '需要先解锁声音';
   }
 }
 
@@ -266,6 +330,10 @@ function runBreathLoop(index = 0) {
   const step = sequence[index % sequence.length];
   breathOrb.className = `orb-core ${step.className}`;
   breathText.textContent = step.phase;
+
+  if (step.phase === '吸气') playCue('inhale');
+  if (step.phase === '停留') playCue('hold');
+  if (step.phase === '呼气') playCue('exhale');
 
   state.breathTimer = setTimeout(() => {
     if (step.phase === '呼气') {
@@ -367,6 +435,27 @@ document.getElementById('startBtn').addEventListener('click', async () => {
 document.getElementById('quickStartBtn').addEventListener('click', async () => {
   await resetSession();
   await startSession();
+});
+
+testSoundBtn.addEventListener('click', async () => {
+  await unlockAudio();
+  meditationAudio.currentTime = 0;
+  meditationAudio.volume = state.volume;
+
+  try {
+    await meditationAudio.play();
+    audioStatus.textContent = '测试播放中';
+    playCue('test');
+    setTimeout(() => {
+      meditationAudio.pause();
+      meditationAudio.currentTime = 0;
+      audioStatus.textContent = state.audioEnabled ? '准备播放' : '已静音';
+    }, 2200);
+  } catch (error) {
+    console.warn('Test playback failed:', error);
+    playCue('test');
+    audioStatus.textContent = '提示音可用，背景音乐受限';
+  }
 });
 
 audioToggleBtn.addEventListener('click', async () => {
